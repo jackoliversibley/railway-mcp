@@ -24,3 +24,5 @@ The app is designed to run on Railway and uses Railway's GraphQL API through a l
 - POST /mcp/tools/call
 - POST /tools/list-deployments
 - POST /tools/get-logs
+
+<!-- redeploy trigger -->
