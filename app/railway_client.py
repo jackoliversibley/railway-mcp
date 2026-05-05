@@ -41,7 +41,7 @@ class RailwayClient:
 
     async def execute(self, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
         if not self.token:
-            raise RailwayError("RAILWAY_API_TOKEN is not set")
+            raise RailwayError("RAILWAY_TOKEN is not set")
 
         payload: dict[str, Any] = {"query": query}
         if variables is not None:
