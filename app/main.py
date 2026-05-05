@@ -2,10 +2,8 @@ import os
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from mcp.server.fastmcp import FastMCP
-from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
 
 app = FastAPI()
-app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 mcp = FastMCP("railway-mcp")
 
 OPEN_PATHS = ["/", "/health", "/openapi.json", "/docs", "/register", "/authorize", "/token"]
@@ -19,10 +17,10 @@ async def auth_middleware(request: Request, call_next):
     path = request.url.path
     if any(path == p for p in OPEN_PATHS) or any(path.startswith(p) for p in OPEN_PREFIXES):
         return await call_next(request)
-
+    
     auth_header = request.headers.get("Authorization")
-    expected_token = os.getenv("MCPAUTH_TOKEN", "")
-
+    expected_token = os.getenv("MCPAUTHTOKEN", "")
+    
     if not auth_header or auth_header != f"Bearer {expected_token}":
         return JSONResponse(
             status_code=status.HTTP_401_UNAUTHORIZED,
