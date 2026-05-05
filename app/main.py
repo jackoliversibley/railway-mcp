@@ -8,49 +8,35 @@ app = FastAPI()
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 mcp = FastMCP("railway-mcp")
 
-OPEN_PATHS = [
-    "/",
-    "/health",
-    "/openapi.json",
-    "/docs",
-    "/register",
-    "/authorize",
-    "/token",
-]
-
-OPEN_PREFIXES = [
-    "/.well-known/",
-    "/mcp/",
-]
-
+OPEN_PATHS = ["/", "/health", "/openapi.json", "/docs", "/register", "/authorize", "/token"]
+OPEN_PREFIXES = ["/.well-known/", "/mcp/"]
 
 def base_url(request: Request) -> str:
     return str(request.base_url).rstrip("/")
 
-
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
-    if any(path == open_path for open_path in OPEN_PATHS) or any(
-        path.startswith(prefix) for prefix in OPEN_PREFIXES
-    ):
+    if any(path == p for p in OPEN_PATHS) or any(path.startswith(p) for p in OPEN_PREFIXES):
         return await call_next(request)
+
     auth_header = request.headers.get("Authorization")
     expected_token = os.getenv("MCPAUTH_TOKEN", "")
-    if not auth_header or auth_header != f"Bearer {expected_token}":
-        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"detail": "Unauthorized"})
-    return await call_next(request)
 
+    if not auth_header or auth_header != f"Bearer {expected_token}":
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"detail": "Unauthorized"}
+        )
+    return await call_next(request)
 
 @app.get("/")
 async def root():
     return {"status": "ok"}
 
-
 @app.get("/health")
 async def health():
     return {"status": "ok"}
-
 
 @app.api_route("/register", methods=["GET", "POST"])
 async def register(request: Request):
@@ -65,7 +51,6 @@ async def register(request: Request):
         "registration_client_uri": f"{origin}/register",
     }
 
-
 @app.get("/.well-known/oauth-protected-resource")
 async def oauth_protected_resource(request: Request):
     origin = base_url(request)
@@ -74,7 +59,6 @@ async def oauth_protected_resource(request: Request):
         "authorization_servers": [origin],
         "bearer_methods_supported": ["header"],
     }
-
 
 @app.get("/.well-known/oauth-authorization-server")
 async def oauth_authorization_server(request: Request):
@@ -89,21 +73,22 @@ async def oauth_authorization_server(request: Request):
         "code_challenge_methods_supported": ["S256"],
     }
 
-
 @app.get("/authorize")
 async def authorize(request: Request):
     redirect_uri = request.query_params.get("redirect_uri") or request.query_params.get("callback")
     state = request.query_params.get("state")
     if not redirect_uri:
-        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": "Missing redirect_uri"})
-    redirect_target = f"{redirect_uri}{'&' if '?' in redirect_uri else '?'}code=mock-auth-code"
+        return JSONResponse(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            content={"detail": "Missing redirect_uri"}
+        )
+    target = f"{redirect_uri}{'&' if '?' in redirect_uri else '?'}code=mock-auth-code"
     if state:
-        redirect_target = f"{redirect_target}&state={state}"
-    return RedirectResponse(url=redirect_target, status_code=status.HTTP_302_FOUND)
-
+        target = f"{target}&state={state}"
+    return RedirectResponse(url=target, status_code=status.HTTP_302_FOUND)
 
 @app.post("/token")
-async def token(request: Request):
+async def token():
     return {
         "access_token": "mock-access-token",
         "token_type": "bearer",
@@ -111,10 +96,8 @@ async def token(request: Request):
         "refresh_token": "mock-refresh-token",
     }
 
-
 @mcp.tool()
 async def list_deployments():
     return "tools coming soon"
-
 
 app.mount("/mcp", mcp.sse_app())
