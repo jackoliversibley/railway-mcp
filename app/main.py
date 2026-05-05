@@ -7,9 +7,8 @@ from contextlib import asynccontextmanager
 from typing import Any, Literal
 
 import uvicorn
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
 from mcp.server.fastmcp import FastMCP
 
 from .railway_client import DEFAULT_RAILWAY_API_URL, RailwayClient
@@ -29,7 +28,6 @@ async def _get_tool_names() -> list[str]:
     list_tools = getattr(mcp._mcp_server, "list_tools", None)
     if list_tools is None or not callable(list_tools):
         raise TypeError(f"list_tools is not callable: {type(list_tools)!r}")
-
     tools = await _maybe_await(list_tools())
     return [tool.name for tool in tools]
 
@@ -53,32 +51,6 @@ app.add_middleware(
 )
 
 
-@app.middleware("http")
-async def verify_mcp_auth_token(request: Request, call_next):
-    if request.url.path not in {"/", "/health"}:
-        expected_token = os.getenv("MCP_AUTH_TOKEN", "")
-        authorization = request.headers.get("authorization", "")
-        if not expected_token:
-            return JSONResponse(
-                {"detail": "MCP_AUTH_TOKEN is not configured"},
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-        if not authorization.lower().startswith("bearer "):
-            return JSONResponse(
-                {"detail": "Missing Bearer token"},
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        provided_token = authorization.split(" ", 1)[1].strip()
-        if provided_token != expected_token:
-            return JSONResponse(
-                {"detail": "Invalid Bearer token"},
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-    return await call_next(request)
-
-
 @app.get("/")
 async def root() -> dict[str, str]:
     return {"name": "railway-mcp", "status": "ok"}
@@ -90,7 +62,6 @@ async def health() -> dict[str, Any]:
         "ok": True,
         "railway_token_configured": bool(os.getenv("RAILWAY_TOKEN")),
         "railway_api_url": os.getenv("RAILWAY_API_URL", DEFAULT_RAILWAY_API_URL),
-        "mcp_auth_token_configured": bool(os.getenv("MCP_AUTH_TOKEN")),
     }
 
 
@@ -118,7 +89,6 @@ async def get_logs(
         return {"logs": logs}
 
 
-# Mount the FastMCP Starlette app at the root so /sse and /messages are exposed directly.
 app.mount("/", mcp.sse_app())
 
 
