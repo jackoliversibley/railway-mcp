@@ -6,7 +6,7 @@ from mcp.server.fastmcp import FastMCP
 app = FastAPI()
 mcp = FastMCP("railway-mcp")
 
-OPEN_PATHS = {
+OPEN_PATHS = [
     "/",
     "/health",
     "/openapi.json",
@@ -14,7 +14,12 @@ OPEN_PATHS = {
     "/register",
     "/authorize",
     "/token",
-}
+]
+
+OPEN_PREFIXES = [
+    "/.well-known/",
+    "/mcp/",
+]
 
 
 def base_url(request: Request) -> str:
@@ -24,7 +29,9 @@ def base_url(request: Request) -> str:
 @app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
-    if path in OPEN_PATHS or path.startswith("/.well-known/") or path == "/mcp" or path.startswith("/mcp/"):
+    if any(path == open_path for open_path in OPEN_PATHS) or any(
+        path.startswith(prefix) for prefix in OPEN_PREFIXES
+    ):
         return await call_next(request)
     auth_header = request.headers.get("Authorization")
     expected_token = os.getenv("MCPAUTH_TOKEN", "")
