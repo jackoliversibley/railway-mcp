@@ -51,15 +51,11 @@ async def root() -> dict[str, str]:
     return {"name": "railway-mcp", "status": "ok"}
 
 
-health_app = FastAPI(title="railway-mcp-health", version="0.1.0")
-
-
-@health_app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
+@app.api_route("/health", methods=["GET", "HEAD"], include_in_schema=False)
 async def health() -> PlainTextResponse:
     return PlainTextResponse("ok")
 
 
-app.mount("/health", health_app)
 app.mount("/", mcp.sse_app())
 
 
