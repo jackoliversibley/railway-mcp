@@ -8,7 +8,7 @@ app = FastAPI()
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 mcp = FastMCP("railway-mcp")
 
-OPEN_PATHS = {
+OPEN_PATHS = [
     "/",
     "/health",
     "/openapi.json",
@@ -16,9 +16,12 @@ OPEN_PATHS = {
     "/register",
     "/authorize",
     "/token",
-    "/.well-known/oauth-protected-resource",
-    "/.well-known/oauth-authorization-server",
-}
+]
+
+OPEN_PREFIXES = [
+    "/.well-known/",
+    "/mcp/",
+]
 
 
 def base_url(request: Request) -> str:
@@ -26,23 +29,11 @@ def base_url(request: Request) -> str:
 
 
 @app.middleware("http")
-async def content_type_middleware(request: Request, call_next):
-    if request.method == "POST" and (
-        request.url.path == "/mcp" or request.url.path.startswith("/mcp/")
-    ):
-        headers = list(request.scope.get("headers") or [])
-        if not any(name == b"content-type" for name, _ in headers):
-            headers.append((b"content-type", b"application/json"))
-            request.scope["headers"] = headers
-    return await call_next(request)
-
-
-@app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
-    if path in OPEN_PATHS:
-        return await call_next(request)
-    if path.startswith("/mcp") and request.method in {"GET", "HEAD", "OPTIONS"}:
+    if any(path == open_path for open_path in OPEN_PATHS) or any(
+        path.startswith(prefix) for prefix in OPEN_PREFIXES
+    ):
         return await call_next(request)
     auth_header = request.headers.get("Authorization")
     expected_token = os.getenv("MCPAUTH_TOKEN", "")
@@ -53,7 +44,7 @@ async def auth_middleware(request: Request, call_next):
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "mcp": "/mcp"}
+    return {"status": "ok"}
 
 
 @app.get("/health")
@@ -101,19 +92,14 @@ async def oauth_authorization_server(request: Request):
 
 @app.get("/authorize")
 async def authorize(request: Request):
-    origin = base_url(request)
-    redirect_uri = request.query_params.get("redirect_uri")
+    redirect_uri = request.query_params.get("redirect_uri") or request.query_params.get("callback")
     state = request.query_params.get("state")
-    if redirect_uri:
-        redirect_target = f"{redirect_uri}{'&' if '?' in redirect_uri else '?'}code=mock-auth-code"
-        if state:
-            redirect_target = f"{redirect_target}&state={state}"
-        return RedirectResponse(url=redirect_target, status_code=status.HTTP_302_FOUND)
-    return {
-        "authorization_endpoint": f"{origin}/authorize",
-        "detail": "Mock authorization endpoint",
-        "code": "mock-auth-code",
-    }
+    if not redirect_uri:
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": "Missing redirect_uri"})
+    redirect_target = f"{redirect_uri}{'&' if '?' in redirect_uri else '?'}code=mock-auth-code"
+    if state:
+        redirect_target = f"{redirect_target}&state={state}"
+    return RedirectResponse(url=redirect_target, status_code=status.HTTP_302_FOUND)
 
 
 @app.post("/token")
