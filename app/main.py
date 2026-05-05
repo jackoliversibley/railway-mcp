@@ -46,12 +46,12 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="railway-mcp", version="0.1.0", lifespan=lifespan)
 
 
-@asynccontextmanager
-async def _health_lifespan(app: FastAPI):
-    yield
+@app.get("/")
+async def root() -> dict[str, str]:
+    return {"name": "railway-mcp", "status": "ok"}
 
 
-health_app = FastAPI(title="railway-mcp-health", version="0.1.0", lifespan=_health_lifespan)
+health_app = FastAPI(title="railway-mcp-health", version="0.1.0")
 
 
 @health_app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
@@ -61,11 +61,6 @@ async def health() -> PlainTextResponse:
 
 app.mount("/health", health_app)
 app.mount("/", mcp.sse_app())
-
-
-@app.get("/")
-async def root() -> dict[str, str]:
-    return {"name": "railway-mcp", "status": "ok"}
 
 
 @mcp.tool()
