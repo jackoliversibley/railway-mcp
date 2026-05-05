@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
+DEFAULT_RAILWAY_TOKEN = os.getenv("RAILWAY_TOKEN", "")
 DEFAULT_RAILWAY_API_URL = "https://backboard.railway.com/graphql/v2"
 
 
@@ -14,7 +16,7 @@ class RailwayError(RuntimeError):
 
 @dataclass
 class RailwayClient:
-    token: str
+    token: str = DEFAULT_RAILWAY_TOKEN
     api_url: str = DEFAULT_RAILWAY_API_URL
     _client: httpx.AsyncClient | None = None
 
