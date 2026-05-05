@@ -12,6 +12,8 @@ OPEN_PATHS = {
     "/openapi.json",
     "/docs",
     "/register",
+    "/authorize",
+    "/token",
     "/.well-known/oauth-protected-resource",
     "/.well-known/oauth-authorization-server",
 }
@@ -80,6 +82,33 @@ async def oauth_authorization_server(request: Request):
         "response_types_supported": ["code"],
         "grant_types_supported": ["authorization_code", "refresh_token"],
         "code_challenge_methods_supported": ["S256"],
+    }
+
+
+@app.get("/authorize")
+async def authorize(request: Request):
+    origin = base_url(request)
+    redirect_uri = request.query_params.get("redirect_uri")
+    state = request.query_params.get("state")
+    if redirect_uri:
+        redirect_target = f"{redirect_uri}{'&' if '?' in redirect_uri else '?'}code=mock-auth-code"
+        if state:
+            redirect_target = f"{redirect_target}&state={state}"
+        return RedirectResponse(url=redirect_target, status_code=status.HTTP_302_FOUND)
+    return {
+        "authorization_endpoint": f"{origin}/authorize",
+        "detail": "Mock authorization endpoint",
+        "code": "mock-auth-code",
+    }
+
+
+@app.post("/token")
+async def token(request: Request):
+    return {
+        "access_token": "mock-access-token",
+        "token_type": "bearer",
+        "expires_in": 3600,
+        "refresh_token": "mock-refresh-token",
     }
 
 
