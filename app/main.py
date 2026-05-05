@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from typing import Any, Literal
 
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
 from mcp.server.fastmcp import FastMCP
@@ -53,6 +53,32 @@ app.add_middleware(
 )
 
 
+@app.middleware("http")
+async def verify_mcp_auth_token(request: Request, call_next):
+    if request.url.path not in {"/", "/health"}:
+        expected_token = os.getenv("MCP_AUTH_TOKEN", "")
+        authorization = request.headers.get("authorization", "")
+        if not expected_token:
+            return JSONResponse(
+                {"detail": "MCP_AUTH_TOKEN is not configured"},
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+        if not authorization.lower().startswith("bearer "):
+            return JSONResponse(
+                {"detail": "Missing Bearer token"},
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        provided_token = authorization.split(" ", 1)[1].strip()
+        if provided_token != expected_token:
+            return JSONResponse(
+                {"detail": "Invalid Bearer token"},
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    return await call_next(request)
+
+
 @app.get("/")
 async def root() -> dict[str, str]:
     return {"name": "railway-mcp", "status": "ok"}
@@ -64,6 +90,7 @@ async def health() -> dict[str, Any]:
         "ok": True,
         "railway_token_configured": bool(os.getenv("RAILWAY_API_TOKEN")),
         "railway_api_url": os.getenv("RAILWAY_API_URL", DEFAULT_RAILWAY_API_URL),
+        "mcp_auth_token_configured": bool(os.getenv("MCP_AUTH_TOKEN")),
     }
 
 
