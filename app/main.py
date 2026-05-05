@@ -2,11 +2,13 @@ import os
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from mcp.server.fastmcp import FastMCP
+from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
 
 app = FastAPI()
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 mcp = FastMCP("railway-mcp")
 
-OPEN_PATHS = [
+OPEN_PATHS = {
     "/",
     "/health",
     "/openapi.json",
@@ -14,12 +16,9 @@ OPEN_PATHS = [
     "/register",
     "/authorize",
     "/token",
-]
-
-OPEN_PREFIXES = [
-    "/.well-known/",
-    "/mcp/",
-]
+    "/.well-known/oauth-protected-resource",
+    "/.well-known/oauth-authorization-server",
+}
 
 
 def base_url(request: Request) -> str:
@@ -27,11 +26,23 @@ def base_url(request: Request) -> str:
 
 
 @app.middleware("http")
+async def content_type_middleware(request: Request, call_next):
+    if request.method == "POST" and (
+        request.url.path == "/mcp" or request.url.path.startswith("/mcp/")
+    ):
+        headers = list(request.scope.get("headers") or [])
+        if not any(name == b"content-type" for name, _ in headers):
+            headers.append((b"content-type", b"application/json"))
+            request.scope["headers"] = headers
+    return await call_next(request)
+
+
+@app.middleware("http")
 async def auth_middleware(request: Request, call_next):
     path = request.url.path
-    if any(path == open_path for open_path in OPEN_PATHS) or any(
-        path.startswith(prefix) for prefix in OPEN_PREFIXES
-    ):
+    if path in OPEN_PATHS:
+        return await call_next(request)
+    if path.startswith("/mcp") and request.method in {"GET", "HEAD", "OPTIONS"}:
         return await call_next(request)
     auth_header = request.headers.get("Authorization")
     expected_token = os.getenv("MCPAUTH_TOKEN", "")
@@ -42,7 +53,7 @@ async def auth_middleware(request: Request, call_next):
 
 @app.get("/")
 async def root():
-    return {"status": "ok"}
+    return {"status": "ok", "mcp": "/mcp"}
 
 
 @app.get("/health")
