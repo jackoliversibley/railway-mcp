@@ -8,7 +8,7 @@ from typing import Any, Literal
 
 import uvicorn
 from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from mcp.server.fastmcp import FastMCP
 
 from .railway_client import DEFAULT_RAILWAY_API_URL, RailwayClient
@@ -51,19 +51,15 @@ async def root() -> dict[str, str]:
     return {"name": "railway-mcp", "status": "ok"}
 
 
-@app.get("/health")
-async def health() -> dict[str, Any]:
-    return {
-        "ok": True,
-        "railway_token_configured": bool(os.getenv("RAILWAY_TOKEN")),
-        "railway_api_url": os.getenv("RAILWAY_API_URL", DEFAULT_RAILWAY_API_URL),
-    }
+@app.api_route("/health", methods=["GET", "HEAD"], include_in_schema=False)
+async def health() -> PlainTextResponse:
+    return PlainTextResponse("ok")
 
 
 @app.middleware("http")
 async def verify_mcp_auth_token(request: Request, call_next):
     if request.url.path not in {"/", "/health"}:
-        expected_token = os.getenv("MCP_AUTH_TOKEN", "")
+        expected_token = os.getenv("MCP_AUTH_TOKEN")
         authorization = request.headers.get("authorization", "")
         if not expected_token:
             return JSONResponse(
@@ -84,6 +80,9 @@ async def verify_mcp_auth_token(request: Request, call_next):
                 headers={"WWW-Authenticate": "Bearer"},
             )
     return await call_next(request)
+
+
+app.mount("/", mcp.sse_app())
 
 
 @mcp.tool()
@@ -108,9 +107,6 @@ async def get_logs(
     ) as client:
         logs = await client.get_logs(deployment_id=deployment_id, log_type=log_type, limit=limit)
         return {"logs": logs}
-
-
-app.mount("/", mcp.sse_app())
 
 
 if __name__ == "__main__":
