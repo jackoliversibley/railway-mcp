@@ -8,7 +8,7 @@ from typing import Any, Literal
 
 import uvicorn
 from fastapi import FastAPI
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from fastapi.responses import PlainTextResponse
 from mcp.server.fastmcp import FastMCP
 
 from .railway_client import DEFAULT_RAILWAY_API_URL, RailwayClient
@@ -45,24 +45,27 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="railway-mcp", version="0.1.0", lifespan=lifespan)
 
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=["localhost", "127.0.0.1", "[::1]", "*.up.railway.app"],
-)
+
+@asynccontextmanager
+async def _health_lifespan(app: FastAPI):
+    yield
+
+
+health_app = FastAPI(title="railway-mcp-health", version="0.1.0", lifespan=_health_lifespan)
+
+
+@health_app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
+async def health() -> PlainTextResponse:
+    return PlainTextResponse("ok")
+
+
+app.mount("/health", health_app)
+app.mount("/", mcp.sse_app())
 
 
 @app.get("/")
 async def root() -> dict[str, str]:
     return {"name": "railway-mcp", "status": "ok"}
-
-
-@app.get("/health")
-async def health() -> dict[str, Any]:
-    return {
-        "ok": True,
-        "railway_token_configured": bool(os.getenv("RAILWAY_TOKEN")),
-        "railway_api_url": os.getenv("RAILWAY_API_URL", DEFAULT_RAILWAY_API_URL),
-    }
 
 
 @mcp.tool()
@@ -87,9 +90,6 @@ async def get_logs(
     ) as client:
         logs = await client.get_logs(deployment_id=deployment_id, log_type=log_type, limit=limit)
         return {"logs": logs}
-
-
-app.mount("/", mcp.sse_app())
 
 
 if __name__ == "__main__":
