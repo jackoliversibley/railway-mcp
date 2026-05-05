@@ -88,7 +88,7 @@ async def root() -> dict[str, str]:
 async def health() -> dict[str, Any]:
     return {
         "ok": True,
-        "railway_token_configured": bool(os.getenv("RAILWAY_API_TOKEN")),
+        "railway_token_configured": bool(os.getenv("RAILWAY_TOKEN")),
         "railway_api_url": os.getenv("RAILWAY_API_URL", DEFAULT_RAILWAY_API_URL),
         "mcp_auth_token_configured": bool(os.getenv("MCP_AUTH_TOKEN")),
     }
@@ -97,7 +97,7 @@ async def health() -> dict[str, Any]:
 @mcp.tool()
 async def list_deployments(project_id: str, service_id: str, limit: int = 10) -> dict[str, Any]:
     async with RailwayClient(
-        token=os.getenv("RAILWAY_API_TOKEN", ""),
+        token=os.getenv("RAILWAY_TOKEN", ""),
         api_url=os.getenv("RAILWAY_API_URL", DEFAULT_RAILWAY_API_URL),
     ) as client:
         deployments = await client.list_deployments(project_id=project_id, service_id=service_id, limit=limit)
@@ -111,7 +111,7 @@ async def get_logs(
     limit: int = 100,
 ) -> dict[str, Any]:
     async with RailwayClient(
-        token=os.getenv("RAILWAY_API_TOKEN", ""),
+        token=os.getenv("RAILWAY_TOKEN", ""),
         api_url=os.getenv("RAILWAY_API_URL", DEFAULT_RAILWAY_API_URL),
     ) as client:
         logs = await client.get_logs(deployment_id=deployment_id, log_type=log_type, limit=limit)
