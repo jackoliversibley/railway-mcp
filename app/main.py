@@ -88,7 +88,7 @@ async def authorize(request: Request):
 @app.post("/token")
 async def token():
     return {
-        "access_token": "mock-access-token",
+        "access_token": os.getenv("MCPAUTHTOKEN", ""),
         "token_type": "bearer",
         "expires_in": 3600,
         "refresh_token": "mock-refresh-token",
