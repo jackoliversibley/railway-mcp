@@ -6,7 +6,7 @@ from typing import Any
 
 import httpx
 
-DEFAULT_RAILWAY_TOKEN = os.getenv("RAILWAY_TOKEN", "")
+DEFAULT_RAILWAY_TOKEN = os.getenv("RAILWAYTOKEN", "")
 DEFAULT_RAILWAY_API_URL = "https://backboard.railway.com/graphql/v2"
 
 
