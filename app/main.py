@@ -13,12 +13,10 @@ from authlib.common.security import generate_token
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 from mcp.server.fastmcp import FastMCP
-from starlette.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from app.railway_client import RailwayClient, RailwayError
 
 app = FastAPI()
-app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 mcp = FastMCP("railway-mcp")
 
 OPEN_PATHS = ["/", "/health", "/openapi.json", "/docs", "/register", "/authorize", "/token"]
